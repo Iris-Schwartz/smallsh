@@ -105,7 +105,6 @@ int main()
     }
     else
     {
-      printf("Some other command\n");
       if (curr_command->input_file != NULL || curr_command->output_file != NULL)
       {
         lastSignalNum = redirect(curr_command->input_file, curr_command->output_file);
@@ -138,5 +137,22 @@ int background_command(char *command)
 
 int foreground_command(char *command)
 {
-  printf("Foreground command");
+  char *newargv[] = {command, NULL, NULL};
+  int childStatus; 
+
+  pid_t idOfChild = fork(); 
+
+  switch(idOfChild) {
+    case 0:
+      execvp(command, newargv);
+      exit(0);
+      break; 
+    default: 
+      idOfChild = waitpid(idOfChild, &childStatus, 0);
+      if (WIFEXITED(childStatus)) {
+        return WEXITSTATUS(childStatus);
+      } else {
+        return WTERMSIG(childStatus);
+      }
+  }
 }
