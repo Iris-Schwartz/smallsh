@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/wait.h>
 
 #define INPUT_LENGTH 2048
 #define MAX_ARGS 512
@@ -108,6 +109,7 @@ int main()
       if (curr_command->input_file != NULL || curr_command->output_file != NULL)
       {
         lastSignalNum = redirect(curr_command->input_file, curr_command->output_file);
+        printf("Result of redirect function", lastSignalNum);
       }
       else
       {
@@ -127,32 +129,77 @@ int main()
 
 int redirect(char *input_file, char *output_file)
 {
-  printf("Redirected.\n");
+  int result = 0;
+  if (input_file == NULL)
+  {
+    int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    result = dup2(fd1, 1);
+    printf("stdout redirected to output file.\n");
+  }
+  else if (output_file == NULL)
+  {
+    int fd2 = open(input_file, O_WRONLY | O_CREAT, 0644);
+    result = dup2(fd2, 0);
+    printf("stdin redirected to input file.\n");
+  }
+  else
+  {
+    int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd2 = open(input_file, O_WRONLY | O_CREAT, 0644);
+    result = dup2(fd1, fd2);
+    printf("stdout and stdin redirected");
+  }
+  return result;
 }
 
 int background_command(char *command)
 {
-  printf("Background command");
+  char *newargv[] = {command, NULL, NULL};
+  int childStatus;
+
+  pid_t idOfChild = fork();
+
+  switch (idOfChild)
+  {
+  case 0:
+    execvp(command, newargv);
+    exit(0);
+    break;
+  default:
+    idOfChild = waitpid(idOfChild, &childStatus, WNOHANG);
+    if (WIFEXITED(childStatus))
+    {
+      return WEXITSTATUS(childStatus);
+    }
+    else
+    {
+      return WTERMSIG(childStatus);
+    }
+  }
 }
 
 int foreground_command(char *command)
 {
   char *newargv[] = {command, NULL, NULL};
-  int childStatus; 
+  int childStatus;
 
-  pid_t idOfChild = fork(); 
+  pid_t idOfChild = fork();
 
-  switch(idOfChild) {
-    case 0:
-      execvp(command, newargv);
-      exit(0);
-      break; 
-    default: 
-      idOfChild = waitpid(idOfChild, &childStatus, 0);
-      if (WIFEXITED(childStatus)) {
-        return WEXITSTATUS(childStatus);
-      } else {
-        return WTERMSIG(childStatus);
-      }
+  switch (idOfChild)
+  {
+  case 0:
+    execvp(command, newargv);
+    exit(0);
+    break;
+  default:
+    idOfChild = waitpid(idOfChild, &childStatus, 0);
+    if (WIFEXITED(childStatus))
+    {
+      return WEXITSTATUS(childStatus);
+    }
+    else
+    {
+      return WTERMSIG(childStatus);
+    }
   }
 }
