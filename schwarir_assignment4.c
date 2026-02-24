@@ -11,7 +11,7 @@
 #define INPUT_LENGTH 2048
 #define MAX_ARGS 512
 
-int redirect(char *input, char *output);
+void redirect(char *input, char *output);
 int background_command(char *command);
 int foreground_command(char *command);
 
@@ -108,8 +108,29 @@ int main()
     {
       if (curr_command->input_file != NULL || curr_command->output_file != NULL)
       {
-        lastSignalNum = redirect(curr_command->input_file, curr_command->output_file);
-        printf("Result of redirect function", lastSignalNum);
+        pid_t spawnid = fork();
+
+        switch (spawnid)
+        {
+        case -1:
+          perror("problem with fork");
+          break;
+        case 0:
+          redirect(curr_command->input_file, curr_command->output_file);
+          // TA suggested that the second argument of the call to execvp be curr_command->argv
+          for (int i = 0; curr_command->argv[i] != NULL; i++)
+          {
+            printf("args[%d] = %s\n", i, curr_command->argv[i]);
+            fflush(stdout);
+          }
+          // if (execvp(curr_command->argv[0], curr_command->argv == -1)) {
+          //   perror("Child process could not execute new program");
+          // }
+          exit(0);
+          break;
+        case 1:
+          break;
+        }
       }
       else
       {
@@ -127,29 +148,46 @@ int main()
   return EXIT_SUCCESS;
 }
 
-int redirect(char *input_file, char *output_file)
+void redirect(char *input_file, char *output_file)
 {
-  int result = 0;
   if (input_file == NULL)
   {
     int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    result = dup2(fd1, 1);
-    printf("stdout redirected to output file.\n");
+    if (fd1 == -1)
+    {
+      perror("problem opening output file");
+    }
+    if (dup2(fd1, 1) == -1)
+    {
+      perror("error redirecting stdout to output file");
+    };
+    close(fd1);
+    printf("Stdout redirected to output file.\n");
   }
   else if (output_file == NULL)
   {
-    int fd2 = open(input_file, O_WRONLY | O_CREAT, 0644);
-    result = dup2(fd2, 0);
+    int fd2 = open(input_file, O_RDONLY);
+    if (fd2 == -1)
+    {
+      perror("Error redirecting stdin to input file");
+    }
+    if (dup2(fd2, 0) == -1)
+    {
+      perror("error redirecting");
+    };
+    close(fd2);
     printf("stdin redirected to input file.\n");
   }
   else
   {
     int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    int fd2 = open(input_file, O_WRONLY | O_CREAT, 0644);
-    result = dup2(fd1, fd2);
+    int fd2 = open(input_file, O_RDONLY);
+    dup2(fd2, 0);
+    dup2(fd1, 1);
     printf("stdout and stdin redirected");
+    close(fd1);
+    close(fd2);
   }
-  return result;
 }
 
 int background_command(char *command)
