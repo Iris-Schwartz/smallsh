@@ -133,7 +133,7 @@ void redirect(struct command_line *curr_command)
     }
     if (dup2(fd1, 1) == -1)
     {
-      printf("error redirecting stdout to output file");
+      printf("Error redirecting stdout to output file.");
       exit(1);
     };
     if (curr_command->is_bg)
@@ -141,12 +141,11 @@ void redirect(struct command_line *curr_command)
       int fd2 = open("/dev/null", O_WRONLY);
       if (dup2(fd2, 0) == -1)
       {
-        printf("error redirecting stdout to input file");
+        printf("Error redirecting stdin to input file.");
         exit(1);
       };
     }
     close(fd1);
-    printf("Stdout redirected to output file.\n");
   }
   if (curr_command->input_file != NULL)
   {
@@ -158,7 +157,7 @@ void redirect(struct command_line *curr_command)
     }
     if (dup2(fd2, 0) == -1)
     {
-      printf("Error redirecting stdin to input file");
+      printf("Error redirecting stdin to input file.");
       exit(1);
     };
     if (curr_command->is_bg)
@@ -166,12 +165,11 @@ void redirect(struct command_line *curr_command)
       int fd2 = open("/dev/null", O_RDONLY);
       if (dup2(fd2, 1) == -1)
       {
-        printf("error redirecting stdout to output file");
+        printf("Error redirecting stdout to output file.");
         exit(1);
       };
     }
     close(fd2);
-    printf("stdin redirected to input file.\n");
   }
 }
 
@@ -187,11 +185,14 @@ int background_command(char *argv[])
 
   switch (idOfChild)
   {
+  case -1:
+    perror("issue with fork()");
+    exit(1);
   case 0:
     redirect(argv[0]);
     if (execvp(argv[0], argv) == -1)
     {
-      perror("Child process could not execute new program");
+      printf("%s: no such file or directory\n", argv[0]);
       exit(1);
     }
     break;
