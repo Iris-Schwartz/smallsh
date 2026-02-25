@@ -11,10 +11,6 @@
 #define INPUT_LENGTH 2048
 #define MAX_ARGS 512
 
-void redirect(struct command_line *curr_command);
-int background_command(char *argv[]);
-int foreground_command(char *argv[]);
-
 struct command_line
 {
   char *argv[MAX_ARGS + 1];
@@ -23,6 +19,10 @@ struct command_line
   char *output_file;
   bool is_bg;
 };
+
+void redirect(struct command_line *curr_command);
+int background_command(char *argv[]);
+int foreground_command(char *argv[]);
 
 struct command_line *parse_input()
 {
@@ -62,7 +62,7 @@ struct command_line *parse_input()
 int main()
 {
   struct command_line *curr_command;
-  int lastSignalNum = 0;
+  int lastExitStatus = 0;
 
   while (true)
   {
@@ -74,13 +74,13 @@ int main()
     }
     else if (strcmp(curr_command->argv[0], "status") == 0)
     {
-      if (lastSignalNum == 0)
+      // if (lastSignalNum == 0)
+      // {
+      //   exit(0);
+      // }
+
       {
-        exit(0);
-      }
-      else
-      {
-        printf("%s", lastSignalNum);
+        printf("exit value %d\n", lastExitStatus);
       }
     }
     else if (strcmp(curr_command->argv[0], "exit") == 0)
@@ -106,32 +106,15 @@ int main()
     }
     else
     {
-      pid_t spawnid = fork();
-
-      switch (spawnid)
-      {
-      case -1:
-        perror("problem with fork");
-        break;
-      case 0:
-        redirect(curr_command);
-        // TA suggested that the second argument of the call to execvp be curr_command->argv
-        if (execvp(curr_command->argv[0], curr_command->argv) == -1)
-        {
-          perror("Child process could not execute new program");
-        }
-        break;
-      case 1:
-        break;
-      }
-
+      redirect(curr_command);
+      // TA suggested that the second argument of the call to execvp be curr_command->argv
       if (curr_command->is_bg)
       {
-        lastSignalNum = background_command(curr_command->argv);
+        background_command(curr_command->argv);
       }
       else
       {
-        lastSignalNum = foreground_command(curr_command->argv);
+        lastExitStatus = foreground_command(curr_command->argv);
       }
     }
   }
@@ -140,7 +123,7 @@ int main()
 
 void redirect(struct command_line *curr_command)
 {
-  if (curr_command->input_file == NULL)
+  if (curr_command->output_file != NULL)
   {
     int fd1 = open(curr_command->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd1 == -1)
@@ -165,7 +148,7 @@ void redirect(struct command_line *curr_command)
     close(fd1);
     printf("Stdout redirected to output file.\n");
   }
-  if (curr_command->output_file == NULL)
+  if (curr_command->input_file != NULL)
   {
     int fd2 = open(curr_command->input_file, O_RDONLY);
     if (fd2 == -1)
@@ -228,10 +211,12 @@ int foreground_command(char *argv[])
 
   switch (idOfChild)
   {
+  case -1:
+    perror("issue with fork()");
   case 0:
     if (execvp(argv[0], argv) == -1)
     {
-      perror("Child process could not execute new program");
+      printf("%s: no such file or directory\n", argv[0]);
       exit(1);
     }
     break;
