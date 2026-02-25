@@ -23,6 +23,7 @@ struct command_line
 void redirect(struct command_line *curr_command);
 int background_command(char *argv[]);
 int foreground_command(char *argv[]);
+// void handle_SIGTSTP(int signal);
 
 struct command_line *parse_input()
 {
@@ -106,7 +107,6 @@ int main()
     }
     else
     {
-      redirect(curr_command);
       // TA suggested that the second argument of the call to execvp be curr_command->argv
       if (curr_command->is_bg)
       {
@@ -175,6 +175,10 @@ void redirect(struct command_line *curr_command)
   }
 }
 
+// void handle_SIGTSTP(int signal)
+// {
+// }
+
 int background_command(char *argv[])
 {
   int childStatus;
@@ -184,6 +188,7 @@ int background_command(char *argv[])
   switch (idOfChild)
   {
   case 0:
+    redirect(argv[0]);
     if (execvp(argv[0], argv) == -1)
     {
       perror("Child process could not execute new program");
@@ -213,7 +218,9 @@ int foreground_command(char *argv[])
   {
   case -1:
     perror("issue with fork()");
+    exit(1);
   case 0:
+    redirect(argv[0]);
     if (execvp(argv[0], argv) == -1)
     {
       printf("%s: no such file or directory\n", argv[0]);
