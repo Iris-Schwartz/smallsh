@@ -12,7 +12,7 @@
 #define MAX_ARGS 512
 
 void redirect(char *input, char *output);
-int background_command(char *command);
+int background_command(char *argv[]);
 int foreground_command(char *argv[]);
 
 struct command_line
@@ -207,9 +207,8 @@ void redirect(char *input_file, char *output_file)
   }
 }
 
-int background_command(char *command)
+int background_command(char *argv[])
 {
-  char *newargv[] = {command, NULL, NULL};
   int childStatus;
 
   pid_t idOfChild = fork();
@@ -217,8 +216,11 @@ int background_command(char *command)
   switch (idOfChild)
   {
   case 0:
-    execvp(command, newargv);
-    exit(0);
+    if (execvp(argv[0], argv) == -1)
+    {
+      perror("Child process could not execute new program");
+      exit(1);
+    }
     break;
   default:
     idOfChild = waitpid(idOfChild, &childStatus, WNOHANG);
@@ -242,8 +244,11 @@ int foreground_command(char *argv[])
   switch (idOfChild)
   {
   case 0:
-    execvp(argv[0], argv);
-    exit(0);
+    if (execvp(argv[0], argv) == -1)
+    {
+      perror("Child process could not execute new program");
+      exit(1);
+    }
     break;
   default:
     idOfChild = waitpid(idOfChild, &childStatus, 0);
