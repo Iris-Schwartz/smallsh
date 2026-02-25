@@ -11,7 +11,7 @@
 #define INPUT_LENGTH 2048
 #define MAX_ARGS 512
 
-void redirect(char *input, char *output);
+void redirect(struct command_line *curr_command);
 int background_command(char *argv[]);
 int foreground_command(char *argv[]);
 
@@ -106,51 +106,46 @@ int main()
     }
     else
     {
-      if (curr_command->input_file != NULL || curr_command->output_file != NULL)
-      {
-        pid_t spawnid = fork();
+      pid_t spawnid = fork();
 
-        switch (spawnid)
+      switch (spawnid)
+      {
+      case -1:
+        perror("problem with fork");
+        break;
+      case 0:
+        redirect(curr_command);
+        // TA suggested that the second argument of the call to execvp be curr_command->argv
+        if (execvp(curr_command->argv[0], curr_command->argv) == -1)
         {
-        case -1:
-          perror("problem with fork");
-          break;
-        case 0:
-          redirect(curr_command->input_file, curr_command->output_file);
-          // TA suggested that the second argument of the call to execvp be curr_command->argv
-          if (execvp(curr_command->argv[0], curr_command->argv) == -1)
-          {
-            perror("Child process could not execute new program");
-          }
-          break;
-        case 1:
-          break;
+          perror("Child process could not execute new program");
         }
+        break;
+      case 1:
+        break;
+      }
+
+      if (curr_command->is_bg)
+      {
+        lastSignalNum = background_command(curr_command->argv);
       }
       else
       {
-        if (curr_command->is_bg)
-        {
-          lastSignalNum = background_command(curr_command->argv);
-        }
-        else
-        {
-          lastSignalNum = foreground_command(curr_command->argv);
-        }
+        lastSignalNum = foreground_command(curr_command->argv);
       }
     }
   }
   return EXIT_SUCCESS;
 }
 
-void redirect(char *input_file, char *output_file)
+void redirect(struct command_line *curr_command)
 {
-  if (input_file == NULL)
+  if (curr_command->input_file == NULL)
   {
-    int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd1 = open(curr_command->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd1 == -1)
     {
-      printf("cannot open %s for output", output_file);
+      printf("cannot open %s for output", curr_command->output_file);
       exit(1);
     }
     if (dup2(fd1, 1) == -1)
@@ -158,15 +153,24 @@ void redirect(char *input_file, char *output_file)
       printf("error redirecting stdout to output file");
       exit(1);
     };
+    if (curr_command->is_bg)
+    {
+      int fd2 = open("/dev/null", O_WRONLY);
+      if (dup2(fd2, 0) == -1)
+      {
+        printf("error redirecting stdout to input file");
+        exit(1);
+      };
+    }
     close(fd1);
     printf("Stdout redirected to output file.\n");
   }
-  else if (output_file == NULL)
+  if (curr_command->output_file == NULL)
   {
-    int fd2 = open(input_file, O_RDONLY);
+    int fd2 = open(curr_command->input_file, O_RDONLY);
     if (fd2 == -1)
     {
-      printf("cannot open %s for input", input_file);
+      printf("cannot open %s for input", curr_command->input_file);
       exit(1);
     }
     if (dup2(fd2, 0) == -1)
@@ -174,36 +178,17 @@ void redirect(char *input_file, char *output_file)
       printf("Error redirecting stdin to input file");
       exit(1);
     };
+    if (curr_command->is_bg)
+    {
+      int fd2 = open("/dev/null", O_RDONLY);
+      if (dup2(fd2, 1) == -1)
+      {
+        printf("error redirecting stdout to output file");
+        exit(1);
+      };
+    }
     close(fd2);
     printf("stdin redirected to input file.\n");
-  }
-  else
-  {
-    int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    int fd2 = open(input_file, O_RDONLY);
-    if (fd2 == -1)
-    {
-      printf("cannot open %s for input", input_file);
-      exit(1);
-    }
-    if (fd1 == -1)
-    {
-      printf("cannot open %s for output", output_file);
-      exit(1);
-    }
-    if (dup2(fd2, 0) == -1)
-    {
-      printf("Error redirecting stdin to input file");
-      exit(1);
-    };
-    if (dup2(fd1, 1) == -1)
-    {
-      printf("error redirecting stdout to output file");
-      exit(1);
-    };
-    printf("stdout and stdin redirected");
-    close(fd1);
-    close(fd2);
   }
 }
 
