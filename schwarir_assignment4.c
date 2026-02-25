@@ -13,7 +13,7 @@
 
 void redirect(char *input, char *output);
 int background_command(char *command);
-int foreground_command(char *command);
+int foreground_command(char *argv[]);
 
 struct command_line
 {
@@ -118,15 +118,10 @@ int main()
         case 0:
           redirect(curr_command->input_file, curr_command->output_file);
           // TA suggested that the second argument of the call to execvp be curr_command->argv
-          for (int i = 0; curr_command->argv[i] != NULL; i++)
+          if (execvp(curr_command->argv[0], curr_command->argv) == -1)
           {
-            printf("args[%d] = %s\n", i, curr_command->argv[i]);
-            fflush(stdout);
+            perror("Child process could not execute new program");
           }
-          // if (execvp(curr_command->argv[0], curr_command->argv == -1)) {
-          //   perror("Child process could not execute new program");
-          // }
-          exit(0);
           break;
         case 1:
           break;
@@ -136,11 +131,11 @@ int main()
       {
         if (curr_command->is_bg)
         {
-          lastSignalNum = background_command(curr_command->argv[0]);
+          lastSignalNum = background_command(curr_command->argv);
         }
         else
         {
-          lastSignalNum = foreground_command(curr_command->argv[0]);
+          lastSignalNum = foreground_command(curr_command->argv);
         }
       }
     }
@@ -155,11 +150,13 @@ void redirect(char *input_file, char *output_file)
     int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd1 == -1)
     {
-      perror("problem opening output file");
+      printf("cannot open %s for output", output_file);
+      exit(1);
     }
     if (dup2(fd1, 1) == -1)
     {
-      perror("error redirecting stdout to output file");
+      printf("error redirecting stdout to output file");
+      exit(1);
     };
     close(fd1);
     printf("Stdout redirected to output file.\n");
@@ -169,11 +166,13 @@ void redirect(char *input_file, char *output_file)
     int fd2 = open(input_file, O_RDONLY);
     if (fd2 == -1)
     {
-      perror("Error redirecting stdin to input file");
+      printf("cannot open %s for input", input_file);
+      exit(1);
     }
     if (dup2(fd2, 0) == -1)
     {
-      perror("error redirecting");
+      printf("Error redirecting stdin to input file");
+      exit(1);
     };
     close(fd2);
     printf("stdin redirected to input file.\n");
@@ -182,8 +181,26 @@ void redirect(char *input_file, char *output_file)
   {
     int fd1 = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     int fd2 = open(input_file, O_RDONLY);
-    dup2(fd2, 0);
-    dup2(fd1, 1);
+    if (fd2 == -1)
+    {
+      printf("cannot open %s for input", input_file);
+      exit(1);
+    }
+    if (fd1 == -1)
+    {
+      printf("cannot open %s for output", output_file);
+      exit(1);
+    }
+    if (dup2(fd2, 0) == -1)
+    {
+      printf("Error redirecting stdin to input file");
+      exit(1);
+    };
+    if (dup2(fd1, 1) == -1)
+    {
+      printf("error redirecting stdout to output file");
+      exit(1);
+    };
     printf("stdout and stdin redirected");
     close(fd1);
     close(fd2);
@@ -216,9 +233,8 @@ int background_command(char *command)
   }
 }
 
-int foreground_command(char *command)
+int foreground_command(char *argv[])
 {
-  char *newargv[] = {command, NULL, NULL};
   int childStatus;
 
   pid_t idOfChild = fork();
@@ -226,7 +242,7 @@ int foreground_command(char *command)
   switch (idOfChild)
   {
   case 0:
-    execvp(command, newargv);
+    execvp(argv[0], argv);
     exit(0);
     break;
   default:
