@@ -6,7 +6,8 @@ TO DO:
 -- change message printed with # command
 -- add fflush where helpful to print stdout buffer contents to terminal
 -- add message about background process pid when background process started
--- add the following signal handling: 
+-- add the following signal handling:
+-- how to prevent "Terminated" to print upon exit from smallsh shell
 
 -----------------------------SIGINT-------------------------------SIGTSSP
 
@@ -127,6 +128,11 @@ int main()
     }
     else if (strcmp(curr_command->argv[0], "exit") == 0)
     {
+      // kills all background processes that shell has previously started before it terminates itself (note: they will eventually also be reaped, or removed from ps table, by init, since parent process does not reap them here)
+      for (int i = 0; i <= last_index_in_background_processes_array; i++)
+      {
+        kill(background_processes[i].background_process_pid, SIGTERM);
+      }
       exit(0);
     }
     else if (strcmp(curr_command->argv[0], "cd") == 0)
