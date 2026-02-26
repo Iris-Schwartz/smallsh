@@ -1,17 +1,16 @@
 /*
 TO DO:
- -- reminder to change all names to snake_case
- -- upon exit from smallsh, smallsh must kill any other processes or jobs that shell has started  before it terminates itself (i.e. background processes)
+-- reminder to change all names to snake_case
 -- test functionality of cd command
 -- change message printed with # command
 -- add fflush where helpful to print stdout buffer contents to terminal
 -- add message about background process pid when background process started
--- add the following signal handling:
 -- how to prevent "Terminated" to print upon exit from smallsh shell
+-- add the following signal handling (✅ if finished)
 
------------------------------SIGINT-------------------------------SIGTSSP
+-----------------------------SIGINT-------------------------------SIGTSTP
 
-shell                        ignore                                ***
+shell                        ignore  ✅                            ***
 
 background_process           ignore                               ignore
 
@@ -30,6 +29,10 @@ Display another informative message (see below) immediately after any currently 
 The shell then returns back to the normal condition where the & operator is once again honored for subsequent commands, allowing them to be executed in the background.
 */
 
+#define _POSIX_C_SOURCE 200809L // ChatGPT recommended adding this due to issues creating struct sigaction instance
+
+#include <sys/types.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -37,7 +40,6 @@ The shell then returns back to the normal condition where the & operator is once
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <signal.h>
 #include <sys/wait.h>
 
 #define INPUT_LENGTH 2048
@@ -66,8 +68,9 @@ int lastExitStatus = 0;
 void redirect(struct command_line *curr_command);
 int background_command(struct command_line *curr_command);
 int foreground_command(struct command_line *curr_command);
-// void handle_SIGTSTP(int signal);
 
+// this function was provided as started code by Professor Tonsmann from OSU's CS 374 class for
+// the purposes of this assignment
 struct command_line *parse_input()
 {
   char input[INPUT_LENGTH];
@@ -106,6 +109,18 @@ struct command_line *parse_input()
 int main()
 {
   struct command_line *curr_command;
+
+  // in discussing my reasoning for installing the ignore_signal signal handler right after the printing of the smallsh : command prompt (to ignore SIGINT in the shell) ChatGPT provided a strong argument for installing it at the start of main
+
+  // program code for signal handler installation was adapted from OSU's CS 374's "Exploration: Signal Handling API" lesson
+  // in module 7 (provided by Professor Tonsmann)
+  struct sigaction ignore_signal = {0};
+
+  ignore_signal.sa_handler = SIG_IGN;
+  sigfillset(&ignore_signal.sa_mask);
+  ignore_signal.sa_flags = 0;
+
+  sigaction(SIGINT, &ignore_signal, NULL);
 
   while (true)
   {
