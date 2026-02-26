@@ -22,9 +22,18 @@ struct command_line
   bool is_bg;
 };
 
+struct background_process
+{
+  pid_t background_process_pid;
+  char *background_process_name;
+};
+
+int last_index_in_background_processes_array = 0;
+struct background_process background_processes[512];
+
 void redirect(struct command_line *curr_command);
-int background_command(char *argv[]);
-int foreground_command(char *argv[]);
+int background_command(struct command_line *curr_command);
+int foreground_command(struct command_line *curr_command);
 // void handle_SIGTSTP(int signal);
 
 struct command_line *parse_input()
@@ -66,7 +75,6 @@ int main()
 {
   struct command_line *curr_command;
   int lastExitStatus = 0;
-  // reminder to change all names to snake_case
 
   while (true)
   {
@@ -112,11 +120,11 @@ int main()
     {
       if (curr_command->is_bg)
       {
-        background_command(curr_command->argv);
+        background_command(curr_command);
       }
       else
       {
-        lastExitStatus = foreground_command(curr_command->argv);
+        lastExitStatus = foreground_command(curr_command);
       }
     }
 
@@ -129,7 +137,14 @@ int main()
     {
       if (WIFEXITED(childStatus))
       {
-        // printf(" # the background %s finally finished", );
+        for (int i = 0; i < 512; i++)
+        {
+          if (background_processes[i].background_process_pid == childPid)
+          {
+            printf("background pid %d is done: exit value 0\n", background_processes[i].background_process_pid);
+            printf(" # the background %s finally finished\n", background_processes[i].background_process_name);
+          }
+        }
       }
       else
       {
@@ -196,20 +211,25 @@ void redirect(struct command_line *curr_command)
 // {
 // }
 
-int background_command(char *argv[])
+int background_command(struct command_line *curr_command)
 {
-  pid_t idOfChild = fork();
+  pid_t pidOfChild = fork();
 
-  switch (idOfChild)
+  background_processes[last_index_in_background_processes_array + 1].background_process_pid = pidOfChild;
+  background_processes[last_index_in_background_processes_array + 1].background_process_name = curr_command->argv[0];
+
+  last_index_in_background_processes_array++;
+
+  switch (pidOfChild)
   {
   case -1:
     perror("issue with fork()");
     exit(1);
   case 0:
-    redirect(argv[0]);
-    if (execvp(argv[0], argv) == -1)
+    redirect(curr_command);
+    if (execvp(curr_command->argv[0], curr_command->argv) == -1)
     {
-      printf("%s: no such file or directory\n", argv[0]);
+      printf("%s: no such file or directory\n", curr_command->argv[0]);
       exit(1);
     }
     break;
@@ -217,27 +237,27 @@ int background_command(char *argv[])
   }
 }
 
-int foreground_command(char *argv[])
+int foreground_command(struct command_line *curr_command)
 {
   int childStatus;
 
-  pid_t idOfChild = fork();
+  pid_t pidOfChild = fork();
 
-  switch (idOfChild)
+  switch (pidOfChild)
   {
   case -1:
     perror("issue with fork()");
     exit(1);
   case 0:
-    redirect(argv[0]);
-    if (execvp(argv[0], argv) == -1)
+    redirect(curr_command);
+    if (execvp(curr_command->argv[0], curr_command->argv) == -1)
     {
-      printf("%s: no such file or directory\n", argv[0]);
+      printf("%s: no such file or directory\n", curr_command->argv[0]);
       exit(1);
     }
     break;
   default:
-    idOfChild = waitpid(idOfChild, &childStatus, 0);
+    pidOfChild = waitpid(pidOfChild, &childStatus, 0);
     if (WIFEXITED(childStatus))
     {
       return WEXITSTATUS(childStatus);
