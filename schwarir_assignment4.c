@@ -1,3 +1,5 @@
+// reminder to change all names to snake_case
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -64,6 +66,7 @@ int main()
 {
   struct command_line *curr_command;
   int lastExitStatus = 0;
+  // reminder to change all names to snake_case
 
   while (true)
   {
@@ -107,7 +110,6 @@ int main()
     }
     else
     {
-      // TA suggested that the second argument of the call to execvp be curr_command->argv
       if (curr_command->is_bg)
       {
         background_command(curr_command->argv);
@@ -117,8 +119,25 @@ int main()
         lastExitStatus = foreground_command(curr_command->argv);
       }
     }
+
+    int childStatus;
+    int childPid;
+    // the shell constantly checks if any background child process just finished and reaps it
+    // (removes it from ps table) if so before the next command prompt is printed
+    // assistance was provided by TA to generate the proper while loop header
+    while ((childPid = waitpid(-1, &childStatus, WNOHANG)) > 0)
+    {
+      if (WIFEXITED(childStatus))
+      {
+        // printf(" # the background %s finally finished", );
+      }
+      else
+      {
+        printf(WTERMSIG(childStatus));
+      }
+    }
   }
-  return EXIT_SUCCESS;
+  return EXIT_SUCCESS; // exits from shell (parent process)
 }
 
 void redirect(struct command_line *curr_command)
@@ -179,8 +198,6 @@ void redirect(struct command_line *curr_command)
 
 int background_command(char *argv[])
 {
-  int childStatus;
-
   pid_t idOfChild = fork();
 
   switch (idOfChild)
@@ -197,15 +214,6 @@ int background_command(char *argv[])
     }
     break;
   default:
-    idOfChild = waitpid(idOfChild, &childStatus, WNOHANG);
-    if (WIFEXITED(childStatus))
-    {
-      return WEXITSTATUS(childStatus);
-    }
-    else
-    {
-      return WTERMSIG(childStatus);
-    }
   }
 }
 
