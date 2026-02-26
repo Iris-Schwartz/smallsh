@@ -1,4 +1,33 @@
-// reminder to change all names to snake_case
+/*
+TO DO:
+ -- reminder to change all names to snake_case
+ -- upon exit from smallsh, smallsh must kill any other processes or jobs that shell has started  before it terminates itself (i.e. background processes)
+-- test functionality of cd command
+-- change message printed with # command
+-- add fflush where helpful to print stdout buffer contents to terminal
+-- add message about background process pid when background process started
+-- add the following signal handling: 
+
+-----------------------------SIGINT-------------------------------SIGTSSP
+
+shell                        ignore                                ***
+
+background_process           ignore                               ignore
+
+foreground_process         foreground process                     ignore
+                             terminates itself
+                            and parent immediately
+                             prints which
+                          signal killed foreground process
+
+*** The shell must display an informative message (see below) immediately if it's sitting at the prompt, or immediately after any currently running foreground process has terminated
+The shell then enters a state where subsequent commands can no longer be run in the background.
+In this state, the & operator must simply be ignored, i.e., all such commands are run as if they were foreground processes.
+
+If the user sends SIGTSTP again, then your shell will
+Display another informative message (see below) immediately after any currently running foreground process terminates
+The shell then returns back to the normal condition where the & operator is once again honored for subsequent commands, allowing them to be executed in the background.
+*/
 
 #include <stdio.h>
 #include <string.h>
@@ -102,8 +131,6 @@ int main()
     }
     else if (strcmp(curr_command->argv[0], "cd") == 0)
     {
-      // I asked ChatGPT how to change directories
-      // look up where getenv was in the notes
       if (curr_command->argv[1] != NULL)
       {
         chdir(curr_command->argv[1]);
@@ -163,13 +190,11 @@ void redirect(struct command_line *curr_command)
     {
       printf("cannot open %s for output", curr_command->output_file);
       exit(1);
-      // Should lastExitStatus be set to 1 given a check if foreground command?
     }
     if (dup2(fd1, 1) == -1)
     {
       printf("Error redirecting stdout to output file.");
       exit(1);
-      // Should lastExitStatus be set to 1 given a check if foreground command?
     };
     if (curr_command->is_bg)
     {
@@ -178,7 +203,6 @@ void redirect(struct command_line *curr_command)
       {
         printf("Error redirecting stdin to input file.");
         exit(1);
-        // Should lastExitStatus be set to 1 given a check if foreground command?
       };
     }
     close(fd1);
