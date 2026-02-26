@@ -6,7 +6,9 @@ TO DO:
 -- add fflush where helpful to print stdout buffer contents to terminal
 -- add message about background process pid when background process started
 -- how to prevent "Terminated" to print upon exit from smallsh shell
+-- Debug why cd command with and without arguments fails
 -- ask TA why parent won't print which signal killed foreground child process
+-- ask TA how to handle if blank line and whether it's necessary to print something
 -- add the following signal handling (✅ if finished)
 
 -----------------------------SIGINT-------------------------------SIGTSTP
@@ -129,7 +131,7 @@ int main()
     curr_command = parse_input();
     if (curr_command->argc == 0 || curr_command->argv[0][0] == '#')
     {
-      printf("Comment or blank line found\n");
+      printf("that was a command line, this is a comment line\n");
       continue;
     }
     else if (strcmp(curr_command->argv[0], "status") == 0)
@@ -156,13 +158,17 @@ int main()
     {
       if (curr_command->argv[1] != NULL)
       {
-        chdir(curr_command->argv[1]);
-        perror("Issue changing to a certain directory");
+        if (chdir(curr_command->argv[1]) == -1)
+        {
+          perror("Issue changing to a certain directory");
+        }
       }
       else
       {
-        chdir(getenv("HOME"));
-        perror("Issue changing to home directory");
+        if (chdir(getenv("HOME") == -1))
+        {
+          perror("Issue changing to home directory");
+        };
       }
     }
     else
@@ -191,7 +197,7 @@ int main()
           if (background_processes[i].background_process_pid == childPid)
           {
             printf("background pid %d is done: exit value 0\n", background_processes[i].background_process_pid);
-            printf(" # the background %s finally finished\n", background_processes[i].background_process_name);
+            printf("the background %s finally finished\n", background_processes[i].background_process_name);
           }
         }
       }
@@ -264,11 +270,6 @@ int background_command(struct command_line *curr_command)
 {
   pid_t pidOfChild = fork();
 
-  background_processes[last_index_in_background_processes_array + 1].background_process_pid = pidOfChild;
-  background_processes[last_index_in_background_processes_array + 1].background_process_name = curr_command->argv[0];
-
-  last_index_in_background_processes_array++;
-
   switch (pidOfChild)
   {
   case -1:
@@ -281,8 +282,13 @@ int background_command(struct command_line *curr_command)
       printf("%s: no such file or directory\n", curr_command->argv[0]);
       exit(1);
     }
+
     break;
   default:
+    background_processes[last_index_in_background_processes_array + 1].background_process_pid = pidOfChild;
+    background_processes[last_index_in_background_processes_array + 1].background_process_name = curr_command->argv[0];
+    last_index_in_background_processes_array++;
+    printf("background pid is %d\n", pidOfChild);
   }
 }
 
