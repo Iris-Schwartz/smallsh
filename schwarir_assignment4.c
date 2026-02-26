@@ -30,6 +30,8 @@ struct background_process
 
 int last_index_in_background_processes_array = 0;
 struct background_process background_processes[512];
+int has_run_foreground_command = 0;
+int lastExitStatus = 0;
 
 void redirect(struct command_line *curr_command);
 int background_command(struct command_line *curr_command);
@@ -74,7 +76,6 @@ struct command_line *parse_input()
 int main()
 {
   struct command_line *curr_command;
-  int lastExitStatus = 0;
 
   while (true)
   {
@@ -86,20 +87,18 @@ int main()
     }
     else if (strcmp(curr_command->argv[0], "status") == 0)
     {
-      // if (lastSignalNum == 0)
-      // {
-      //   exit(0);
-      // }
-
+      if (has_run_foreground_command == 0)
+      {
+        printf("exit value 0\n");
+      }
+      else
       {
         printf("exit value %d\n", lastExitStatus);
       }
     }
     else if (strcmp(curr_command->argv[0], "exit") == 0)
     {
-      // kill(-1, 9);
       exit(0);
-      printf("Exited");
     }
     else if (strcmp(curr_command->argv[0], "cd") == 0)
     {
@@ -164,11 +163,13 @@ void redirect(struct command_line *curr_command)
     {
       printf("cannot open %s for output", curr_command->output_file);
       exit(1);
+      // Should lastExitStatus be set to 1 given a check if foreground command?
     }
     if (dup2(fd1, 1) == -1)
     {
       printf("Error redirecting stdout to output file.");
       exit(1);
+      // Should lastExitStatus be set to 1 given a check if foreground command?
     };
     if (curr_command->is_bg)
     {
@@ -177,6 +178,7 @@ void redirect(struct command_line *curr_command)
       {
         printf("Error redirecting stdin to input file.");
         exit(1);
+        // Should lastExitStatus be set to 1 given a check if foreground command?
       };
     }
     close(fd1);
@@ -240,6 +242,7 @@ int background_command(struct command_line *curr_command)
 int foreground_command(struct command_line *curr_command)
 {
   int childStatus;
+  has_run_foreground_command = 1; // needs to be updated in the parent b/c child update won't get remembered by parent
 
   pid_t pidOfChild = fork();
 
