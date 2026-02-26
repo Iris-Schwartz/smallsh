@@ -6,17 +6,19 @@ TO DO:
 -- add fflush where helpful to print stdout buffer contents to terminal
 -- add message about background process pid when background process started
 -- how to prevent "Terminated" to print upon exit from smallsh shell
+-- ask TA why parent won't print which signal killed foreground child process
 -- add the following signal handling (✅ if finished)
 
 -----------------------------SIGINT-------------------------------SIGTSTP
 
 shell                        ignore  ✅                            ***
 
-background_process           ignore                               ignore
+background_process           ignore    ✅ inherited from shell     ignore
 
 foreground_process         foreground process                     ignore
-                             terminates itself
-                            and parent immediately
+                             terminates itself✅
+
+                            parent immediately
                              prints which
                           signal killed foreground process
 
@@ -289,7 +291,13 @@ int foreground_command(struct command_line *curr_command)
   int childStatus;
   has_run_foreground_command = 1; // needs to be updated in the parent b/c child update won't get remembered by parent
 
+  struct sigaction reverse_ignore_from_shell = {0};
+  reverse_ignore_from_shell.sa_handler = SIG_DFL;
+
   pid_t pidOfChild = fork();
+
+  // new signal handler needed for default action of SIGINT b/c signal handler that ignores SIGINT was inherited from parent process
+  sigaction(SIGINT, &reverse_ignore_from_shell, NULL);
 
   switch (pidOfChild)
   {
@@ -306,13 +314,17 @@ int foreground_command(struct command_line *curr_command)
     break;
   default:
     pidOfChild = waitpid(pidOfChild, &childStatus, 0);
-    if (WIFEXITED(childStatus))
+
+    if (WIFEXITED(childStatus)) // if child terminated normally
     {
-      return WEXITSTATUS(childStatus);
+      return WEXITSTATUS(childStatus); // exit value the child passed to exit()
     }
-    else
+    else // if child terminated abnormally
     {
-      return WTERMSIG(childStatus);
+      int sigNum = WTERMSIG(childStatus);
+      printf("terminated by signal %d", sigNum);
+      fflush(stdout);
+      return sigNum; // signal number that caused the child to terminate
     }
   }
 }
