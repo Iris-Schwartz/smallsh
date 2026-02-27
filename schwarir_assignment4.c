@@ -2,22 +2,33 @@
 TO DO:
 -- reminder to change all names to snake_case
 -- add fflush where helpful to print stdout buffer contents to terminal
--- how to prevent "Terminated" to print upon exit from smallsh shell
--- Debug why cd command with and without arguments fails
--- Ask TA how to get the right message after # printed on same line versus the next line
--- ask TA how to handle if blank line and whether it's necessary to print something
+-- Ask TA about the following bugs:
+
+: date
+Fri Feb 27 06:49:35 AM PST 2026
+: ^Z
+Exiting foreground-only modeFri Feb 27 06:49:38 AM PST 2026
+
+
+: sleep 5 &
+background pid is 2604497
+: ^Z
+Entering foreground-only mode (& is now ignored)sleep: missing operand
+Try 'sleep --help' for more information.
+
+
 -- add the following signal handling (✅ if finished)
 
 -----------------------------SIGINT-------------------------------SIGTSTP
 
-shell                        ignore  ✅                            ***
+shell                        ignore  ✅                            *** ✅
 
-background_process           ignore    ✅ inherited from shell     ignore
+background_process           ignore    ✅ inherited from shell     ignore ✅
 
-foreground_process         foreground process                     ignore
+foreground_process         foreground process                     ignore ✅
                              terminates itself✅
 
-                            parent immediately
+                            parent immediately ✅
                              prints which
                           signal killed foreground process
 
@@ -65,10 +76,12 @@ int last_index_in_background_processes_array = 0;
 struct background_process background_processes[512];
 int has_run_foreground_command = 0;
 int lastExitStatus = 0;
+int toggleValue = 0;
 
 void redirect(struct command_line *curr_command);
 int background_command(struct command_line *curr_command);
 int foreground_command(struct command_line *curr_command);
+void SIGTSTP_prevent_background_commmands_toggle(int signal);
 
 // this function was provided as started code by Professor Tonsmann from OSU's CS 374 class for
 // the purposes of this assignment
@@ -111,17 +124,17 @@ int main()
 {
   struct command_line *curr_command;
 
-  // in discussing my reasoning for installing the ignore_signal signal handler right after the printing of the smallsh : command prompt (to ignore SIGINT in the shell) ChatGPT provided a strong argument for installing it at the start of main
+  // in discussing my reasoning for installing the signal handler right after the printing of the smallsh : command prompt (to ignore SIGINT in the shell) ChatGPT provided a strong argument for installing it at the start of main
 
   // program code for signal handler installation was adapted from OSU's CS 374's "Exploration: Signal Handling API" lesson
   // in module 7 (provided by Professor Tonsmann)
-  struct sigaction ignore_signal = {0};
+  struct sigaction ignore_SIGINT_signal = {0};
 
-  ignore_signal.sa_handler = SIG_IGN;
-  sigfillset(&ignore_signal.sa_mask);
-  ignore_signal.sa_flags = 0;
+  ignore_SIGINT_signal.sa_handler = SIG_IGN;
+  sigfillset(&ignore_SIGINT_signal.sa_mask);
+  ignore_SIGINT_signal.sa_flags = 0;
 
-  sigaction(SIGINT, &ignore_signal, NULL);
+  sigaction(SIGINT, &ignore_SIGINT_signal, NULL);
 
   while (true)
   {
@@ -169,8 +182,20 @@ int main()
     }
     else
     {
-      if (curr_command->is_bg)
+      // short circuit evaluation so that foreground command executed as
+      // soon as toggleValue == 0 evaluates to false regardless of value of curr_command->is_bg
+      struct sigaction SIGTSTP_handler = {0};
+
+      sigfillset(&SIGTSTP_handler.sa_mask);
+      SIGTSTP_handler.sa_handler = SIGTSTP_prevent_background_commmands_toggle;
+      SIGTSTP_handler.sa_flags = 0;
+
+      // install signal handler in shell
+      sigaction(SIGTSTP, &SIGTSTP_handler, NULL);
+
+      if (toggleValue == 0 && curr_command->is_bg)
       {
+
         background_command(curr_command);
       }
       else
@@ -258,12 +283,32 @@ void redirect(struct command_line *curr_command)
   }
 }
 
-// void handle_SIGTSTP(int signal)
-// {
-// }
+void SIGTSTP_prevent_background_commmands_toggle(int signal)
+{
+  // if currently not in foreground only mode, then in response to SIGTSTP, switch to foreground
+  // only mode
+  if (toggleValue == 0)
+  {
+    toggleValue = 1;
+    // reentrant function used (not printf())
+    write(1, "\nEntering foreground-only mode (& is now ignored)\n", 49);
+  }
+  // if currently not in foreground only mode, then in response to SIGTSTP, switch to foreground
+  // only mode
+  else
+  {
+    toggleValue = 0;
+    write(1, "\nExiting foreground-only mode\n", 29);
+  }
+}
 
 int background_command(struct command_line *curr_command)
 {
+  struct sigaction ignore_SIGTSTP_signal = {0};
+  ignore_SIGTSTP_signal.sa_handler = SIG_IGN;
+  sigfillset(&ignore_SIGTSTP_signal.sa_mask);
+  ignore_SIGTSTP_signal.sa_flags = 0;
+
   pid_t pidOfChild = fork();
 
   switch (pidOfChild)
@@ -272,6 +317,7 @@ int background_command(struct command_line *curr_command)
     perror("issue with fork()");
     exit(1);
   case 0:
+    sigaction(SIGTSTP, &ignore_SIGTSTP_signal, NULL);
     redirect(curr_command);
     if (execvp(curr_command->argv[0], curr_command->argv) == -1)
     {
@@ -295,9 +341,12 @@ int foreground_command(struct command_line *curr_command)
   struct sigaction reverse_ignore_from_shell = {0};
   reverse_ignore_from_shell.sa_handler = SIG_DFL;
 
-  pid_t pidOfChild = fork();
+  struct sigaction ignore_SIGTSTP_signal = {0};
+  ignore_SIGTSTP_signal.sa_handler = SIG_IGN;
+  sigfillset(&ignore_SIGTSTP_signal.sa_mask);
+  ignore_SIGTSTP_signal.sa_flags = 0;
 
-  // new signal handler needed for default action of SIGINT b/c signal handler that ignores SIGINT was inherited from parent process
+  pid_t pidOfChild = fork();
 
   switch (pidOfChild)
   {
@@ -306,6 +355,7 @@ int foreground_command(struct command_line *curr_command)
     exit(1);
   case 0:
     sigaction(SIGINT, &reverse_ignore_from_shell, NULL);
+    sigaction(SIGTSTP, &ignore_SIGTSTP_signal, NULL);
     redirect(curr_command);
     if (execvp(curr_command->argv[0], curr_command->argv) == -1)
     {
