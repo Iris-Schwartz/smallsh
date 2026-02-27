@@ -1,13 +1,10 @@
 /*
 TO DO:
 -- reminder to change all names to snake_case
--- test functionality of cd command
--- change message printed with # command
 -- add fflush where helpful to print stdout buffer contents to terminal
--- add message about background process pid when background process started
 -- how to prevent "Terminated" to print upon exit from smallsh shell
 -- Debug why cd command with and without arguments fails
--- ask TA why parent won't print which signal killed foreground child process
+-- Ask TA how to get the right message after # printed on same line versus the next line
 -- ask TA how to handle if blank line and whether it's necessary to print something
 -- add the following signal handling (✅ if finished)
 
@@ -131,7 +128,6 @@ int main()
     curr_command = parse_input();
     if (curr_command->argc == 0 || curr_command->argv[0][0] == '#')
     {
-      printf("that was a command line, this is a comment line\n");
       continue;
     }
     else if (strcmp(curr_command->argv[0], "status") == 0)
@@ -165,7 +161,7 @@ int main()
       }
       else
       {
-        if (chdir(getenv("HOME") == -1))
+        if (chdir(getenv("HOME")) == -1)
         {
           perror("Issue changing to home directory");
         };
@@ -203,7 +199,7 @@ int main()
       }
       else
       {
-        printf(WTERMSIG(childStatus));
+        printf("%d", WTERMSIG(childStatus));
       }
     }
   }
@@ -282,7 +278,6 @@ int background_command(struct command_line *curr_command)
       printf("%s: no such file or directory\n", curr_command->argv[0]);
       exit(1);
     }
-
     break;
   default:
     background_processes[last_index_in_background_processes_array + 1].background_process_pid = pidOfChild;
