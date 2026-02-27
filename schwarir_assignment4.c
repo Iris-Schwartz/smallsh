@@ -298,7 +298,6 @@ int foreground_command(struct command_line *curr_command)
   pid_t pidOfChild = fork();
 
   // new signal handler needed for default action of SIGINT b/c signal handler that ignores SIGINT was inherited from parent process
-  sigaction(SIGINT, &reverse_ignore_from_shell, NULL);
 
   switch (pidOfChild)
   {
@@ -306,6 +305,7 @@ int foreground_command(struct command_line *curr_command)
     perror("issue with fork()");
     exit(1);
   case 0:
+    sigaction(SIGINT, &reverse_ignore_from_shell, NULL);
     redirect(curr_command);
     if (execvp(curr_command->argv[0], curr_command->argv) == -1)
     {
@@ -315,7 +315,6 @@ int foreground_command(struct command_line *curr_command)
     break;
   default:
     pidOfChild = waitpid(pidOfChild, &childStatus, 0);
-
     if (WIFEXITED(childStatus)) // if child terminated normally
     {
       return WEXITSTATUS(childStatus); // exit value the child passed to exit()
@@ -323,7 +322,7 @@ int foreground_command(struct command_line *curr_command)
     else // if child terminated abnormally
     {
       int sigNum = WTERMSIG(childStatus);
-      printf("terminated by signal %d", sigNum);
+      printf("terminated by signal %d\n", sigNum);
       fflush(stdout);
       return sigNum; // signal number that caused the child to terminate
     }
