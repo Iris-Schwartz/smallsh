@@ -326,8 +326,8 @@ int background_command(struct command_line *curr_command)
     }
     break;
   default:
-    background_processes[last_index_in_background_processes_array + 1].background_process_pid = pidOfChild;
-    background_processes[last_index_in_background_processes_array + 1].background_process_name = curr_command->argv[0];
+    background_processes[last_index_in_background_processes_array].background_process_pid = pidOfChild;
+    background_processes[last_index_in_background_processes_array].background_process_name = curr_command->argv[0];
     last_index_in_background_processes_array++;
     printf("background pid is %d\n", pidOfChild);
   }
